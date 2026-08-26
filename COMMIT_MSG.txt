@@ -1,0 +1,12 @@
+feat: implement full Expense Tracker with frontend, backend APIs, and SQLite integration
+
+- Added React/Vite + Tailwind frontend (index.html, components, API client)
+- Implemented Go backend with HTTP handlers for /expenses (POST/GET) and /summary
+- Replaced in-memory store with SQLite persistence (internal/store)
+- Added service layer, validation, category rules, and seeded sample data
+- Included architecture.md, decisions.md, acceptance_tests.md, and spec.md
+- Fixed build issues (unused imports, dependency hygiene)
+
+This completes the core MVP as defined in spec.md and acceptance criteria.
+
+Co-authored-by: pravallikachejerla
