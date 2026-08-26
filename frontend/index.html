@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+        body { font-family: 'Inter', system_ui, sans-serif; }
+        .chart-container { height: 240px; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="max-w-7xl mx-auto p-6">
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-4xl font-semibold text-gray-900">Expense Tracker</h1>
+                <p class="text-gray-500 mt-1">Track • Categorize • Summarize</p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="showAddModal()" 
+                        class="px-6 py-3 bg-blue-600 text-white rounded-2xl font-medium hover:bg-blue-700 transition flex items-center gap-2">
+                    <span class="text-xl leading-none">+</span> Add Expense
+                </button>
+                <button onclick="showCategoryModal()" 
+                        class="px-6 py-3 bg-gray-800 text-white rounded-2xl font-medium hover:bg-gray-900 transition">
+                    Manage Categories
+                </button>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8" id="summary-cards">
+            <!-- Populated by JS -->
+        </div>
+
+        <!-- Chart -->
+        <div class="bg-white rounded-3xl shadow p-6 mb-8">
+            <h2 class="text-lg font-semibold mb-4 text-gray-800">Spending by Category</h2>
+            <div class="chart-container">
+                <canvas id="spendingChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="bg-white rounded-3xl shadow p-6 mb-6">
+            <div class="flex flex-wrap gap-4 items-end">
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Category</label>
+                    <select id="filter-category" onchange="loadExpenses()" 
+                            class="w-48 border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500">
+                        <option value="">All Categories</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Start Date</label>
+                    <input type="date" id="filter-start" onchange="loadExpenses()" 
+                           class="border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">End Date</label>
+                    <input type="date" id="filter-end" onchange="loadExpenses()" 
+                           class="border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500">
+                </div>
+                <button onclick="resetFilters()" 
+                        class="ml-auto px-5 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 transition">
+                    Reset Filters
+                </button>
+            </div>
+        </div>
+
+        <!-- Expenses Table -->
+        <div class="bg-white rounded-3xl shadow overflow-hidden">
+            <div class="px-8 py-5 border-b flex justify-between items-center bg-gray-50">
+                <h2 class="font-semibold text-gray-800">Recent Expenses</h2>
+                <span id="expense-count" class="text-sm text-gray-500">0 expenses</span>
+            </div>
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b bg-gray-50">
+                        <th class="text-left py-4 px-8 text-xs font-medium text-gray-500">DATE</th>
+                        <th class="text-left py-4 px-4 text-xs font-medium text-gray-500">DESCRIPTION</th>
+                        <th class="text-left py-4 px-4 text-xs font-medium text-gray-500">CATEGORY</th>
+                        <th class="text-right py-4 px-8 text-xs font-medium text-gray-500">AMOUNT</th>
+                        <th class="w-24"></th>
+                    </tr>
+                </thead>
+                <tbody id="expenses-body" class="divide-y">
+                    <!-- Populated by JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div id="expense-modal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md mx-4">
+            <div class="px-8 pt-8 pb-6">
+                <h3 id="modal-title" class="text-2xl font-semibold mb-6">Add Expense</h3>
+                
+                <div class="space-y-5">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-1.5">Description</label>
+                        <input id="modal-desc" type="text" 
+                               class="w-full border border-gray-200 rounded-2xl px-5 py-4 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-5">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1.5">Amount</label>
+                            <input id="modal-amount" type="number" step="0.01" 
+                                   class="w-full border border-gray-200 rounded-2xl px-5 py-4 focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1.5">Category</label>
+                            <select id="modal-category" 
+                                    class="w-full border border-gray-200 rounded-2xl px-5 py-4 focus:outline-none focus:border-blue-500">
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600 mb-1.5">Date</label>
+                        <input id="modal-date" type="date" 
+                               class="w-full border border-gray-200 rounded-2xl px-5 py-4 focus:outline-none focus:border-blue-500">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex border-t">
+                <button onclick="hideModal()" 
+                        class="flex-1 py-5 text-gray-500 font-medium hover:bg-gray-100 rounded-bl-3xl transition">
+                    Cancel
+                </button>
+                <button onclick="saveExpense()" 
+                        id="save-btn"
+                        class="flex-1 py-5 bg-blue-600 text-white font-semibold hover:bg-blue-700 rounded-br-3xl transition">
+                    Save Expense
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Modal -->
+    <div id="category-modal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md mx-4">
+            <div class="p-8">
+                <h3 class="text-2xl font-semibold mb-6">Manage Categories</h3>
+                <div class="flex gap-3 mb-6">
+                    <input id="new-category" type="text" placeholder="New category name" 
+                           class="flex-1 border border-gray-200 rounded-2xl px-5 py-4 focus:outline-none focus:border-blue-500">
+                    <button onclick="addNewCategory()" 
+                            class="px-8 bg-gray-900 text-white rounded-2xl font-medium hover:bg-black transition">
+                        Add
+                    </button>
+                </div>
+                <div id="category-list" class="max-h-64 overflow-auto space-y-2 text-sm">
+                    <!-- populated by JS -->
+                </div>
+            </div>
+            <div class="flex border-t">
+                <button onclick="hideCategoryModal()" 
+                        class="flex-1 py-5 text-gray-500 font-medium hover:bg-gray-100 rounded-bl-3xl transition">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentEditId = null;
+        let chartInstance = null;
+
+        function tailwindInit() {
+            tailwind.config = {
+                content: [],
+                theme: { extend: {} }
+            }
+        }
+
+        async function apiCall(url, method = 'GET', body = null) {
+            const options = { method, headers: { 'Content-Type': 'application/json' } };
+            if (body) options.body = JSON.stringify(body);
+            
+            const res = await fetch(url, options);
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || 'Request failed');
+            return data.data;
+        }
+
+        async function loadSummary() {
+            try {
+                const data = await apiCall('/api/summary');
+                const total = data.total || 0;
+                const byCat = data.by_category || {};
+
+                // Summary cards
+                const cardsHTML = `
+                    <div class="bg-white rounded-3xl shadow p-6">
+                        <div class="text-sm text-gray-500">Total Spent</div>
+                        <div class="text-5xl font-semibold text-gray-900 mt-2">$${total.toFixed(2)}</div>
+                    </div>
+                    <div class="bg-white rounded-3xl shadow p-6">
+                        <div class="text-sm text-gray-500">Transactions</div>
+                        <div class="text-5xl font-semibold text-gray-900 mt-2" id="tx-count">0</div>
+                    </div>
+                    <div class="bg-white rounded-3xl shadow p-6">
+                        <div class="text-sm text-gray-500">Categories</div>
+                        <div class="text-5xl font-semibold text-gray-900 mt-2">${Object.keys(byCat).length}</div>
+                    </div>
+                `;
+                document.getElementById('summary-cards').innerHTML = cardsHTML;
+
+                // Chart
+                renderChart(byCat);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function renderChart(byCat) {
+            const ctx = document.getElementById('spendingChart');
+            if (chartInstance) chartInstance.destroy();
+            
+            const labels = Object.keys(byCat);
+            const values = Object.values(byCat);
+            
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Amount ($)',
+                        data: values,
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 6,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#f3f4f6' } },
+                        x: { grid: { color: '#f3f4f6' } }
+                    }
+                }
+            });
+        }
+
+        async function loadCategories() {
+            try {
+                const cats = await apiCall('/api/categories');
+                const select = document.getElementById('modal-category');
+                const filterSelect = document.getElementById('filter-category');
+                
+                select.innerHTML = '<option value="">Select category</option>';
+                filterSelect.innerHTML = '<option value="">All Categories</option>';
+                
+                cats.forEach(cat => {
+                    const opt1 = document.createElement('option');
+                    opt1.value = cat;
+                    opt1.textContent = cat;
+                    select.appendChild(opt1);
+                    
+                    const opt2 = document.createElement('option');
+                    opt2.value = cat;
+                    opt2.textContent = cat;
+                    filterSelect.appendChild(opt2);
+                });
+                
+                // Also populate category modal list
+                let listHTML = '';
+                cats.forEach(cat => {
+                    listHTML += `<div class="flex justify-between items-center px-4 py-3 bg-gray-50 rounded-2xl">
+                        <span class="font-medium">${cat}</span>
+                    </div>`;
+                });
+                document.getElementById('category-list').innerHTML = listHTML || '<p class="text-gray-400 italic">No categories yet.</p>';
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function loadExpenses() {
+            try {
+                let url = '/api/expenses';
+                const params = new URLSearchParams();
+                
+                const cat = document.getElementById('filter-category').value;
+                const start = document.getElementById('filter-start').value;
+                const end = document.getElementById('filter-end').value;
+                
+                if (cat) params.append('category', cat);
+                if (start) params.append('start', new Date(start).toISOString());
+                if (end) params.append('end', new Date(end).toISOString());
+                
+                if (params.toString()) url += '?' + params.toString();
+                
+                const expenses = await apiCall(url);
+                
+                const tbody = document.getElementById('expenses-body');
+                tbody.innerHTML = '';
+                
+                expenses.forEach(exp => {
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-gray-50 transition';
+                    row.innerHTML = `
+                        <td class="py-5 px-8 text-sm text-gray-600">${new Date(exp.date).toLocaleDateString()}</td>
+                        <td class="py-5 px-4 text-sm font-medium">${exp.description}</td>
+                        <td class="py-5 px-4">
+                            <span class="inline-block px-4 py-1 text-xs font-medium rounded-3xl bg-blue-100 text-blue-700">${exp.category}</span>
+                        </td>
+                        <td class="py-5 px-8 text-right font-semibold text-gray-900">$${parseFloat(exp.amount).toFixed(2)}</td>
+                        <td class="px-4">
+                            <div class="flex gap-2">
+                                <button onclick="editExpense(${exp.id})" class="text-blue-600 hover:text-blue-800 text-xs font-medium">Edit</button>
+                                <button onclick="deleteExpense(${exp.id})" class="text-red-600 hover:text-red-800 text-xs font-medium">Delete</button>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+                
+                document.getElementById('expense-count').textContent = `${expenses.length} expenses`;
+                await loadSummary();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function showAddModal() {
+            currentEditId = null;
+            document.getElementById('modal-title').textContent = 'Add New Expense';
+            document.getElementById('save-btn').textContent = 'Add Expense';
+            document.getElementById('modal-desc').value = '';
+            document.getElementById('modal-amount').value = '';
+            document.getElementById('modal-category').value = '';
+            document.getElementById('modal-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('expense-modal').classList.remove('hidden');
+        }
+
+        function hideModal() {
+            document.getElementById('expense-modal').classList.add('hidden');
+        }
+
+        async function saveExpense() {
+            const desc = document.getElementById('modal-desc').value.trim();
+            const amount = parseFloat(document.getElementById('modal-amount').value);
+            const category = document.getElementById('modal-category').value;
+            let dateStr = document.getElementById('modal-date').value;
+            const date = dateStr ? new Date(dateStr) : new Date();
+            
+            if (!desc || isNaN(amount) || amount <= 0 || !category) {
+                alert('Please fill all fields correctly (amount > 0)');
+                return;
+            }
+            
+            try {
+                if (currentEditId) {
+                    await apiCall(`/api/expenses/${currentEditId}`, 'PUT', {
+                        amount, description: desc, category, date: date.toISOString()
+                    });
+                } else {
+                    await apiCall('/api/expenses', 'POST', {
+                        amount, description: desc, category, date: date.toISOString()
+                    });
+                }
+                hideModal();
+                loadExpenses();
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        async function editExpense(id) {
+            try {
+                const exp = await apiCall(`/api/expenses/${id}`);
+                currentEditId = id;
+                
+                document.getElementById('modal-title').textContent = 'Edit Expense';
+                document.getElementById('save-btn').textContent = 'Update Expense';
+                document.getElementById('modal-desc').value = exp.description;
+                document.getElementById('modal-amount').value = exp.amount;
+                document.getElementById('modal-category').value = exp.category;
+                document.getElementById('modal-date').value = new Date(exp.date).toISOString().split('T')[0];
+                
+                document.getElementById('expense-modal').classList.remove('hidden');
+            } catch (e) {
+                alert('Could not load expense');
+            }
+        }
+
+        async function deleteExpense(id) {
+            if (!confirm('Delete this expense?')) return;
+            try {
+                await apiCall(`/api/expenses/${id}`, 'DELETE');
+                loadExpenses();
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+
+        function showCategoryModal() {
+            loadCategories();
+            document.getElementById('category-modal').classList.remove('hidden');
+        }
+
+        function hideCategoryModal() {
+            document.getElementById('category-modal').classList.add('hidden');
+            loadCategories();
+            loadExpenses();
+        }
+
+        async function addNewCategory() {
+            const name = document.getElementById('new-category').value.trim();
+            if (!name) return;
+            try {
+                await apiCall('/api/categories', 'POST', { name });
+                document.getElementById('new-category').value = '';
+                loadCategories();
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+
+        function resetFilters() {
+            document.getElementById('filter-category').value = '';
+            document.getElementById('filter-start').value = '';
+            document.getElementById('filter-end').value = '';
+            loadExpenses();
+        }
+
+        // Initialize
+        window.onload = function() {
+            tailwindInit();
+            // Include Chart.js from CDN
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+            script.onload = () => {
+                loadCategories();
+                loadExpenses();
+            };
+            document.head.appendChild(script);
+        };
+    </script>
+</body>
+</html>
