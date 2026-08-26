@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+        body { font-family: 'Inter', system-ui; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="max-w-7xl mx-auto p-6">
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-4xl font-semibold text-gray-900">Expense Tracker</h1>
+            <div class="flex items-center gap-4">
+                <div id="user-info" class="text-sm text-gray-600"></div>
+                <button onclick="logout()" class="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg">Logout</button>
+            </div>
+        </div>
+
+        <!-- Auth Form (hidden after login) -->
+        <div id="auth-section" class="bg-white rounded-2xl shadow p-8 max-w-md mx-auto">
+            <div class="flex gap-4 mb-6">
+                <button onclick="showLogin()" id="login-tab" class="flex-1 py-3 text-sm font-medium border-b-2 border-blue-600 text-blue-600">Login</button>
+                <button onclick="showRegister()" id="register-tab" class="flex-1 py-3 text-sm font-medium text-gray-500">Register</button>
+            </div>
+            <div id="auth-form">
+                <!-- JS populated -->
+            </div>
+        </div>
+
+        <!-- Main App (hidden until logged in) -->
+        <div id="main-app" class="hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Add Expense -->
+                <div class="lg:col-span-1 bg-white rounded-2xl shadow p-6">
+                    <h2 class="text-xl font-semibold mb-4">Add Expense</h2>
+                    <form id="expense-form" onsubmit="addExpense(event)">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                                <input type="number" id="amount" step="0.01" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                <input type="text" id="description" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                                <select id="category" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:border-blue-500">
+                                    <option value="Food">Food</option>
+                                    <option value="Transport">Transport</option>
+                                    <option value="Rent">Rent</option>
+                                    <option value="Entertainment">Entertainment</option>
+                                    <option value="Utilities">Utilities</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                                <input type="date" id="date" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:border-blue-500">
+                            </div>
+                            <button type="submit" class="w-full bg-blue-600 text-white py-3.5 rounded-xl font-medium hover:bg-blue-700 transition">Add Expense</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Summary & Chart -->
+                <div class="lg:col-span-2 bg-white rounded-2xl shadow p-6">
+                    <div class="flex justify-between mb-6">
+                        <h2 class="text-xl font-semibold">Dashboard</h2>
+                        <div class="flex gap-2">
+                            <button onclick="loadExpenses()" class="px-4 py-2 text-xs bg-gray-100 hover:bg-gray-200 rounded-lg">Refresh</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mb-8">
+                        <div class="bg-gray-50 p-6 rounded-2xl">
+                            <div class="text-sm text-gray-500">Total Spent</div>
+                            <div id="total-spent" class="text-4xl font-semibold text-gray-900 mt-1">$0.00</div>
+                        </div>
+                        <div class="bg-gray-50 p-6 rounded-2xl">
+                            <div class="text-sm text-gray-500">Transactions</div>
+                            <div id="transaction-count" class="text-4xl font-semibold text-gray-900 mt-1">0</div>
+                        </div>
+                    </div>
+                    <canvas id="category-chart" class="mt-4"></canvas>
+                </div>
+            </div>
+
+            <!-- Expenses List -->
+            <div class="mt-8 bg-white rounded-2xl shadow overflow-hidden">
+                <div class="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
+                    <h3 class="font-semibold">Recent Expenses</h3>
+                    <input type="text" id="search" placeholder="Filter by description..." onkeyup="filterList()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm w-64">
+                </div>
+                <div id="expenses-list" class="divide-y"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentToken = '';
+        let currentUser = 'demo';
+        let chartInstance = null;
+
+        function showLogin() {
+            document.getElementById('login-tab').classList.add('border-b-2', 'border-blue-600', 'text-blue-600');
+            document.getElementById('register-tab').classList.remove('border-b-2', 'border-blue-600', 'text-blue-600');
+            document.getElementById('auth-form').innerHTML = `
+                <input id="username" type="text" placeholder="Username" value="demo" class="w-full px-4 py-3 mb-3 border border-gray-300 rounded-xl">
+                <input id="password" type="password" placeholder="Password" value="demo123" class="w-full px-4 py-3 mb-6 border border-gray-300 rounded-xl">
+                <button onclick="performLogin()" class="w-full bg-blue-600 text-white py-3.5 rounded-xl font-medium">Login</button>
+            `;
+        }
+
+        function showRegister() {
+            document.getElementById('register-tab').classList.add('border-b-2', 'border-blue-600', 'text-blue-600');
+            document.getElementById('login-tab').classList.remove('border-b-2', 'border-blue-600', 'text-blue-600');
+            document.getElementById('auth-form').innerHTML = `
+                <input id="reg-username" type="text" placeholder="Username" class="w-full px-4 py-3 mb-3 border border-gray-300 rounded-xl">
+                <input id="reg-password" type="password" placeholder="Password" class="w-full px-4 py-3 mb-6 border border-gray-300 rounded-xl">
+                <button onclick="performRegister()" class="w-full bg-emerald-600 text-white py-3.5 rounded-xl font-medium">Register</button>
+            `;
+        }
+
+        async function performLogin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const res = await fetch('http://localhost:8080/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username, password})
+            });
+            if (res.ok) {
+                const data = await res.json();
+                currentToken = data.token;
+                currentUser = username;
+                document.getElementById('user-info').textContent = `Logged in as ${username}`;
+                document.getElementById('auth-section').classList.add('hidden');
+                document.getElementById('main-app').classList.remove('hidden');
+                loadExpenses();
+                loadSummary();
+            } else {
+                alert('Login failed');
+            }
+        }
+
+        async function performRegister() {
+            const username = document.getElementById('reg-username').value;
+            const password = document.getElementById('reg-password').value;
+            const res = await fetch('http://localhost:8080/register', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username, password})
+            });
+            if (res.ok) {
+                alert('Registered! Please login.');
+                showLogin();
+            } else {
+                alert('Registration failed');
+            }
+        }
+
+        async function addExpense(e) {
+            e.preventDefault();
+            const amount = parseFloat(document.getElementById('amount').value);
+            const description = document.getElementById('description').value;
+            const category = document.getElementById('category').value;
+            const date = document.getElementById('date').value || new Date().toISOString().split('T')[0];
+
+            const res = await fetch('http://localhost:8080/expenses', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${currentToken}`
+                },
+                body: JSON.stringify({amount, description, category, date: new Date(date)})
+            });
+            if (res.ok) {
+                document.getElementById('expense-form').reset();
+                loadExpenses();
+                loadSummary();
+            } else {
+                alert('Failed to add expense');
+            }
+        }
+
+        async function loadExpenses() {
+            const res = await fetch('http://localhost:8080/expenses', {
+                headers: {'Authorization': `Bearer ${currentToken}`}
+            });
+            const expenses = await res.json();
+            const listEl = document.getElementById('expenses-list');
+            listEl.innerHTML = expenses.map(exp => `
+                <div class="px-6 py-4 flex justify-between items-center hover:bg-gray-50">
+                    <div>
+                        <div class="font-medium">${exp.description}</div>
+                        <div class="text-sm text-gray-500">${exp.category} • ${new Date(exp.date).toLocaleDateString()}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-semibold text-lg">$${exp.amount.toFixed(2)}</div>
+                        <button onclick="deleteExpense(${exp.id})" class="text-red-500 text-xs mt-1">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+            document.getElementById('transaction-count').textContent = expenses.length;
+        }
+
+        async function loadSummary() {
+            const res = await fetch('http://localhost:8080/summary', {
+                headers: {'Authorization': `Bearer ${currentToken}`}
+            });
+            const data = await res.json();
+            document.getElementById('total-spent').textContent = '$' + data.total.toFixed(2);
+
+            const ctx = document.getElementById('category-chart');
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(data.by_category),
+                    datasets: [{
+                        data: Object.values(data.by_category),
+                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+            });
+        }
+
+        function deleteExpense(id) {
+            if (confirm('Delete this expense?')) {
+                fetch(`http://localhost:8080/expenses/${id}`, {
+                    method: 'DELETE',
+                    headers: {'Authorization': `Bearer ${currentToken}`}
+                }).then(() => {
+                    loadExpenses();
+                    loadSummary();
+                });
+            }
+        }
+
+        function filterList() {
+            // Client-side filter for demo
+            const term = document.getElementById('search').value.toLowerCase();
+            const items = document.querySelectorAll('#expenses-list > div');
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                item.style.display = text.includes(term) ? '' : 'none';
+            });
+        }
+
+        function logout() {
+            currentToken = '';
+            document.getElementById('main-app').classList.add('hidden');
+            document.getElementById('auth-section').classList.remove('hidden');
+            showLogin();
+        }
+
+        // Init
+        window.onload = () => {
+            document.getElementById('date').value = new Date().toISOString().split('T')[0];
+            showLogin();
+            // For demo, auto-login with default
+            setTimeout(() => {
+                if (!currentToken) {
+                    currentToken = 'fake-jwt-for-user-1';
+                    document.getElementById('user-info').textContent = 'Logged in as demo (demo mode)';
+                    document.getElementById('auth-section').classList.add('hidden');
+                    document.getElementById('main-app').classList.remove('hidden');
+                    loadExpenses();
+                    loadSummary();
+                }
+            }, 800);
+        };
+    </script>
+</body>
+</html>
